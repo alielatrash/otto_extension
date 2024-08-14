@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Otto Form Filler</title>
+    <style>
+        body { width: 400px; padding: 10px; font-family: Arial, sans-serif; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
+        button { display: block; width: 100%; margin-bottom: 10px; }
+        #extractedFields { display: none; }
+        .field-row { margin-bottom: 5px; }
+        .field-row label { display: inline-block; width: 150px; }
+        .field-row input { width: 200px; }
+        #rawResponse { white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Paste Email Content</h2>
+    <textarea id="emailContent" placeholder="Paste your email content here..."></textarea>
+    <button id="processButton">Extract Fields</button>
+    <div id="extractedFields">
+        <h3>Extracted Fields</h3>
+        <div id="fieldsContainer"></div>
+        <button id="fillFormButton">Fill Form</button>
+    </div>
+    <div id="status"></div>
+    <h3>Raw ChatGPT Response:</h3>
+    <div id="rawResponse"></div>
+    <script src="popup.js"></script>
+</body>
+</html>

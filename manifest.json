@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Otto",
+  "version": "1.0",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
