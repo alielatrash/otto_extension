@@ -1,3 +1,5 @@
+const config = require('./config'); 
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM fully loaded and parsed');
     const processButton = document.getElementById('processButton');
@@ -117,8 +119,8 @@ function findAllFieldsWithLabels() {
 }
 
 async function sendToChatGPT(emailContent, formFields) {
-    const apiKey = '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'; // Replace with your actual API key
-    const apiUrl = 'https://api.openai.com/v1/chat/completions';
+    const apiKey = config.openAIKey;
+   const apiUrl = 'https://api.openai.com/v1/chat/completions';
 
     const prompt = `
 Given the following email content:
