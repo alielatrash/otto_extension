@@ -535,8 +535,6 @@ function interactWithFields(inputs) {
 }
 
 
-=
-
 function updateStatus(message) {
     console.log("Status update:", message);
     const statusElement = document.getElementById('status');
