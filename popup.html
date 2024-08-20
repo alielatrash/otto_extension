@@ -1,30 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Otto Form Filler</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Otto - Email Extractor</title>
     <style>
-        body { width: 400px; padding: 10px; font-family: Arial, sans-serif; }
-        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
-        button { display: block; width: 100%; margin-bottom: 10px; }
-        #extractedFields { display: none; }
-        .field-row { margin-bottom: 5px; }
-        .field-row label { display: inline-block; width: 150px; }
-        .field-row input { width: 200px; }
-        #rawResponse { white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+        body {
+            width: 400px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+        button {
+            margin-bottom: 10px;
+        }
+        #status, #rawResponse {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .field-row {
+            margin-bottom: 5px;
+        }
+        .field-row label {
+            display: inline-block;
+            width: 100px;
+        }
+        #dropdownOptionsSection {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .dropdown-section {
+            margin-bottom: 15px;
+        }
+        .dropdown-section h3 {
+            margin-bottom: 5px;
+        }
+        .dropdown-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
     </style>
 </head>
 <body>
-    <h2>Paste Email Content</h2>
-    <textarea id="emailContent" placeholder="Paste your email content here..."></textarea>
+    <h1>Otto</h1>
+    
+    <textarea id="emailContent" placeholder="Paste email content here"></textarea>
+    
     <button id="processButton">Extract Fields</button>
-    <div id="extractedFields">
-        <h3>Extracted Fields</h3>
+    <button id="extractOptionsButton">Extract Dropdown Options</button>
+
+    <div id="extractedFields" style="display: none;">
+        <h2>Extracted Fields</h2>
         <div id="fieldsContainer"></div>
         <button id="fillFormButton">Fill Form</button>
     </div>
+
+    <div id="dropdownOptionsSection" style="display: none;">
+        <h2>Extracted Dropdown Options</h2>
+        <div id="optionsContainer"></div>
+    </div>
+
     <div id="status"></div>
+
     <h3>Raw ChatGPT Response:</h3>
     <div id="rawResponse"></div>
+
     <script src="popup.js" type="module"></script>
 </body>
 </html>

@@ -18,6 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error('fillFormButton not found in the DOM');
     }
+
+    const extractOptionsButton = document.getElementById('extractOptionsButton');
+    if (extractOptionsButton) {
+        extractOptionsButton.addEventListener('click', extractAndDisplayOptions);
+    } else {
+        console.error('extractOptionsButton not found in the DOM');
+    }
 });
 
 async function processEmailAndExtractFields() {
@@ -118,9 +125,117 @@ function findAllFieldsWithLabels() {
     return relevantSelectors;
 }
 
+function extractDropdownOptions() {
+    const dropdowns = document.querySelectorAll('input[role="combobox"], .sc-guJBdh.sc-fTFjTM.cxFpzr');
+    const extractedOptions = {};
+
+    dropdowns.forEach((dropdown, index) => {
+        let dropdownOpened = false;
+        const dropdownName = dropdown.id || dropdown.name || `Dropdown ${index + 1}`;
+
+        // Focus on the input field or parent element
+        if (dropdown.tagName.toLowerCase() === 'input') {
+            dropdown.focus();
+        } else {
+            const inputField = dropdown.closest('div').querySelector('input');
+            if (inputField) {
+                inputField.focus();
+            }
+        }
+
+        // Simulate events to open the dropdown
+        const events = ['mouseover', 'mousedown', 'mouseup', 'click'];
+        events.forEach(eventType => {
+            dropdown.dispatchEvent(new MouseEvent(eventType, { bubbles: true }));
+        });
+
+        dropdownOpened = true;
+        console.log(`${dropdownName} should be triggered`);
+
+        // Extract options after a short delay to allow for dropdown to open
+        setTimeout(() => {
+            const optionElements = document.querySelectorAll('[id^="react-select-"][id$="-option"], .css-1jpqh9-option, [class*="option"], .css-1n7v3ny');
+            
+            if (optionElements.length > 0) {
+                extractedOptions[dropdownName] = Array.from(optionElements).map(el => el.textContent.trim());
+                console.log(`Options extracted for ${dropdownName}:`, extractedOptions[dropdownName]);
+            } else {
+                console.log(`No options found for ${dropdownName}`);
+            }
+
+            // Close the dropdown by clicking outside
+            document.body.click();
+        }, 500);
+    });
+
+    // Return the extracted options after all dropdowns have been processed
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(extractedOptions);
+        }, dropdowns.length * 600); // Wait a bit longer than the individual dropdown timeouts
+    });
+}
+
+function extractAndDisplayOptions() {
+    updateStatus('Extracting options from dropdowns...');
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            function: extractDropdownOptions
+        }, (results) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error in extractAndDisplayOptions:", chrome.runtime.lastError);
+                updateStatus(`Error: ${chrome.runtime.lastError.message}`);
+            } else {
+                const extractedOptions = results[0].result;
+                displayDropdownOptions(extractedOptions);
+            }
+        });
+    });
+}
+
+function displayDropdownOptions(dropdownOptions) {
+    const optionsContainer = document.getElementById('optionsContainer');
+    const dropdownOptionsSection = document.getElementById('dropdownOptionsSection');
+    
+    if (!optionsContainer || !dropdownOptionsSection) {
+        console.error("optionsContainer or dropdownOptionsSection not found in the DOM");
+        return;
+    }
+    
+    optionsContainer.innerHTML = '';
+
+    if (Object.keys(dropdownOptions).length === 0) {
+        optionsContainer.innerHTML = '<p>No dropdown options found.</p>';
+    } else {
+        for (const [label, options] of Object.entries(dropdownOptions)) {
+            const dropdownSection = document.createElement('div');
+            dropdownSection.className = 'dropdown-section';
+
+            const labelElement = document.createElement('h3');
+            labelElement.textContent = label;
+            dropdownSection.appendChild(labelElement);
+
+            const optionsList = document.createElement('ul');
+            options.forEach(option => {
+                const listItem = document.createElement('li');
+                listItem.textContent = option;
+                optionsList.appendChild(listItem);
+            });
+            dropdownSection.appendChild(optionsList);
+
+            optionsContainer.appendChild(dropdownSection);
+        }
+    }
+
+    dropdownOptionsSection.style.display = 'block';
+    updateStatus('Dropdown options extracted successfully!');
+}
+
 async function sendToChatGPT(emailContent, formFields) {
     const apiKey = config.openAIKey;
-   const apiUrl = 'https://api.openai.com/v1/chat/completions';
+    const baseUrl = 'https://api.openai.com/v1';
+    const assistantId = 'asst_auGRoJqaRVySWahymKlPW90Q'; // Replace with your actual Assistant ID
 
     const prompt = `
 Given the following email content:
@@ -134,47 +249,115 @@ ${formFields.map(field => `${field.labelText} (${field.type})`).join('\n')}
 Provide your response in JSON format, with the field label as the key and the extracted value as the value. If a value cannot be determined, use null.
 `;
 
-    console.log("Sending prompt to ChatGPT:", prompt);
+    console.log("Sending prompt to Assistant:", prompt);
 
     try {
-        console.log("Attempting to fetch from OpenAI API...");
-        const response = await fetch(apiUrl, {
+        // Step 1: Create a new thread
+        const threadResponse = await fetch(`${baseUrl}/threads`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'Authorization': `Bearer ${apiKey}`,
+                'OpenAI-Beta': 'assistants=v2'
             },
-            body: JSON.stringify({
-                model: "gpt-3.5-turbo",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant that extracts information from emails to fill out forms."
-                    },
-                    {
-                        role: "user",
-                        content: prompt
-                    }
-                ],
-                temperature: 0.7
-            })
+            body: JSON.stringify({})
         });
 
-        console.log("Received response from API. Status:", response.status);
-
-        if (!response.ok) {
-            console.error("API response not OK. Status:", response.status);
-            const errorBody = await response.text();
-            console.error("Error body:", errorBody);
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (!threadResponse.ok) {
+            const errorBody = await threadResponse.text();
+            console.error("Thread creation error:", errorBody);
+            throw new Error(`HTTP error! status: ${threadResponse.status}, body: ${errorBody}`);
         }
 
-        const data = await response.json();
-        console.log("Raw ChatGPT response:", JSON.stringify(data, null, 2));
+        const threadData = await threadResponse.json();
+        const threadId = threadData.id;
 
-        displayRawResponse(data);
+        // Step 2: Add a message to the thread
+        const messageResponse = await fetch(`${baseUrl}/threads/${threadId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'OpenAI-Beta': 'assistants=v2'
+            },
+            body: JSON.stringify({ role: 'user', content: prompt })
+        });
 
-        return data;
+        if (!messageResponse.ok) {
+            const errorBody = await messageResponse.text();
+            console.error("Message creation error:", errorBody);
+            throw new Error(`HTTP error! status: ${messageResponse.status}, body: ${errorBody}`);
+        }
+
+        // Step 3: Run the assistant
+        const runResponse = await fetch(`${baseUrl}/threads/${threadId}/runs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'OpenAI-Beta': 'assistants=v2'
+            },
+            body: JSON.stringify({ assistant_id: assistantId })
+        });
+
+        if (!runResponse.ok) {
+            const errorBody = await runResponse.text();
+            console.error("Run creation error:", errorBody);
+            throw new Error(`HTTP error! status: ${runResponse.status}, body: ${errorBody}`);
+        }
+
+        const runData = await runResponse.json();
+        const runId = runData.id;
+
+        // Step 4: Wait for the run to complete
+        let runStatus;
+        do {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+            const statusResponse = await fetch(`${baseUrl}/threads/${threadId}/runs/${runId}`, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'OpenAI-Beta': 'assistants=v2'
+                }
+            });
+            if (!statusResponse.ok) {
+                const errorBody = await statusResponse.text();
+                console.error("Run status check error:", errorBody);
+                throw new Error(`HTTP error! status: ${statusResponse.status}, body: ${errorBody}`);
+            }
+            const statusData = await statusResponse.json();
+            runStatus = statusData.status;
+        } while (runStatus === 'in_progress');
+
+        if (runStatus !== 'completed') {
+            throw new Error(`Run failed with status: ${runStatus}`);
+        }
+
+        // Step 5: Retrieve the messages
+        const messagesResponse = await fetch(`${baseUrl}/threads/${threadId}/messages`, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'OpenAI-Beta': 'assistants=v2'
+            }
+        });
+
+        if (!messagesResponse.ok) {
+            const errorBody = await messagesResponse.text();
+            console.error("Messages retrieval error:", errorBody);
+            throw new Error(`HTTP error! status: ${messagesResponse.status}, body: ${errorBody}`);
+        }
+
+        const messagesData = await messagesResponse.json();
+        const assistantMessage = messagesData.data.find(msg => msg.role === 'assistant');
+
+        if (!assistantMessage) {
+            throw new Error('No assistant message found');
+        }
+
+        console.log("Raw Assistant response:", assistantMessage);
+
+        displayRawResponse(assistantMessage);
+
+        return assistantMessage;
     } catch (error) {
         console.error("Error in sendToChatGPT:", error);
         throw error;
@@ -193,15 +376,15 @@ function displayRawResponse(response) {
 function displayExtractedFields(formFields, rawResponse) {
     console.log("Displaying extracted fields");
     console.log("Form fields:", formFields);
-    console.log("Raw ChatGPT response:", rawResponse);
+    console.log("Raw Assistant response:", rawResponse);
 
-    if (!rawResponse || !rawResponse.choices || rawResponse.choices.length === 0) {
-        console.error("Invalid or empty ChatGPT response");
-        updateStatus("Error: Invalid response from ChatGPT");
+    if (!rawResponse || !rawResponse.content || rawResponse.content.length === 0) {
+        console.error("Invalid or empty Assistant response");
+        updateStatus("Error: Invalid response from Assistant");
         return;
     }
 
-    const assistantMessage = rawResponse.choices[0].message.content;
+    const assistantMessage = rawResponse.content[0].text.value;
     console.log("Assistant message:", assistantMessage);
 
     let extractedFields;
@@ -209,7 +392,7 @@ function displayExtractedFields(formFields, rawResponse) {
         extractedFields = JSON.parse(assistantMessage);
     } catch (error) {
         console.error("Failed to parse assistant message as JSON:", error);
-        updateStatus("Error: Failed to parse ChatGPT response");
+        updateStatus("Error: Failed to parse Assistant response");
         return;
     }
 
@@ -350,6 +533,9 @@ function interactWithFields(inputs) {
         console.error('No relevant selectors found.');
     }
 }
+
+
+=
 
 function updateStatus(message) {
     console.log("Status update:", message);
