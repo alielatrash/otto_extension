@@ -125,12 +125,12 @@ function findAllFieldsWithLabels() {
     return relevantSelectors;
 }
 
-function extractDropdownOptions() {
+async function extractDropdownOptions() {
     const dropdowns = document.querySelectorAll('input[role="combobox"], .sc-guJBdh.sc-fTFjTM.cxFpzr');
     const extractedOptions = {};
 
-    dropdowns.forEach((dropdown, index) => {
-        let dropdownOpened = false;
+    for (let index = 0; index < dropdowns.length; index++) {
+        const dropdown = dropdowns[index];
         const dropdownName = dropdown.id || dropdown.name || `Dropdown ${index + 1}`;
 
         // Focus on the input field or parent element
@@ -149,32 +149,40 @@ function extractDropdownOptions() {
             dropdown.dispatchEvent(new MouseEvent(eventType, { bubbles: true }));
         });
 
-        dropdownOpened = true;
         console.log(`${dropdownName} should be triggered`);
 
-        // Extract options after a short delay to allow for dropdown to open
-        setTimeout(() => {
-            const optionElements = document.querySelectorAll('[id^="react-select-"][id$="-option"], .css-1jpqh9-option, [class*="option"], .css-1n7v3ny');
-            
-            if (optionElements.length > 0) {
-                extractedOptions[dropdownName] = Array.from(optionElements).map(el => el.textContent.trim());
-                console.log(`Options extracted for ${dropdownName}:`, extractedOptions[dropdownName]);
-            } else {
-                console.log(`No options found for ${dropdownName}`);
-            }
+        // Wait for the dropdown to open and extract the options
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Close the dropdown by clicking outside
-            document.body.click();
-        }, 500);
-    });
+        const optionElements = document.querySelectorAll('[id^="react-select-"][id$="-option"], .css-1jpqh9-option, [class*="option"], .css-1n7v3ny');
+        
+        if (optionElements.length > 0) {
+            extractedOptions[dropdownName] = Array.from(optionElements).map(el => el.textContent.trim());
+            console.log(`Options extracted for ${dropdownName}:`, extractedOptions[dropdownName]);
+        } else {
+            console.log(`No options found for ${dropdownName}`);
+        }
+
+        // Close the dropdown using Escape key
+        const escapeEvent = new KeyboardEvent('keydown', {
+            key: 'Escape',
+            keyCode: 27,
+            bubbles: true
+        });
+        dropdown.dispatchEvent(escapeEvent);
+
+        // As an additional measure, click outside to close the dropdown
+        document.body.click();
+
+        // Wait for the dropdown to close before moving to the next one
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
 
     // Return the extracted options after all dropdowns have been processed
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(extractedOptions);
-        }, dropdowns.length * 600); // Wait a bit longer than the individual dropdown timeouts
-    });
+    return extractedOptions;
 }
+
+
 
 function extractAndDisplayOptions() {
     updateStatus('Extracting options from dropdowns...');
